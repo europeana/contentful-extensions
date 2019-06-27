@@ -1,0 +1,15 @@
+{
+  "id": "europeanaEntityId",
+  "name": "Europeana entity ID",
+  "srcdoc": "./index.html",
+  "fieldTypes": ["Symbol", "Text"],
+  "parameters": {
+    "installation": [
+      {
+        "id": "apiKey",
+        "type": "Symbol",
+        "name": "API Key"
+      }
+    ]
+  }
+}

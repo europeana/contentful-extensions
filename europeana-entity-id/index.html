@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Europeana entity ID</title>
+    <link rel="stylesheet" href="https://contentful.github.io/ui-extensions-sdk/cf-extension.css">
+    <script src="https://unpkg.com/contentful-ui-extensions-sdk@3"></script>
+
+    <style>
+      .cf-form-field {
+        height: 220px;
+        margin-bottom: 0;
+      }
+
+      #depiction-preview {
+        float: right;
+        max-height: 200px;
+        max-width: 35%;
+      }
+
+      #depiction-preview div {
+        height: 200px;
+        width: 100%;
+        background: #ddd;
+      }
+
+      #depiction-preview img {
+        width: auto;
+        max-height: 200px;
+      }
+
+      input.cf-form-input {
+        width: 60%;
+      }
+    </style>
+  </head>
+  <body>
+
+    <div class="cf-form-field">
+      <div id="depiction-preview"></div>
+      <input type="text" placeholder="Enter an entity URI or entity page URL" class="cf-form-input"/>
+      <p>
+        <button id="find-entity" class="cf-btn-secondary">Go!</button>
+        <button id="reset-entity" class="cf-btn-secondary">Reset</button>
+      </p>
+      <div id="message" class="cf-form-hint"></div>
+    </div>
+
+    <script>
+      'use strict';
+
+      window.contentfulExtension.init(extension => {
+        extension.window.startAutoResizer();
+
+        const inputEntityId = document.querySelector('.cf-form-input');
+        const fieldEntityId = extension.field;
+        let valueEntityId = fieldEntityId.getValue();
+        validateInput();
+
+        if (extension.entry.fields.image.getValue()) {
+          document.getElementById('depiction-preview').innerHTML = `<img src="${extension.entry.fields.image.getValue()}" alt="" />`;
+        }
+
+        const detachValueChangeHandler = fieldEntityId.onValueChanged(valueChangeHandler);
+        inputEntityId.addEventListener('input', keyboardInputHandler);
+        inputEntityId.addEventListener('blur', validateInput);
+        window.addEventListener('onbeforeunload', unloadHandler);
+
+        function validateInput() {
+          if (valueEntityId !== undefined && valueEntityId !== inputEntityId.value) {
+            document.getElementById('find-entity').click();
+          }
+        }
+
+        function valueChangeHandler (value) {
+          inputEntityId.value = value || '';
+        }
+
+        function keyboardInputHandler () {
+          const value = inputEntityId.value;
+          if (typeof value !== 'string' || value === '') {
+            fieldEntityId.removeValue();
+          } else {
+            fieldEntityId.setValue(value);
+          }
+        }
+
+        function unloadHandler () {
+          window.removeEventListener('onbeforeunload', unloadHandler);
+          inputEntityId.removeEventListener('input', keyboardInputHandler);
+          detachValueChangeHandler();
+        }
+
+        // find a value in one of the defined languages
+        function languageValue (value) {
+          const languageKeys = ['en', 'eng']; // TODO: move to configuration parameters
+          for (let key of languageKeys) {
+            if (value.hasOwnProperty(key)) {
+              return value[key];
+            }
+          }
+          return '';
+        }
+
+        // clear all fields
+        function clearEntry () {
+          // clear message
+          sendMessage('');
+
+          // clear fields
+          for (const field in extension.entry.fields) {
+            extension.entry.fields[field].removeValue();
+          }
+
+          document.getElementById('depiction-preview').innerHTML = '';
+        }
+
+        function entityIdFromInput(value) {
+          const entityUri = inputEntityId.value.match(new RegExp('^http://data.europeana.eu(/(agent|concept|place)/(base/)?[0-9]+$)'));
+          if (entityUri) {
+            return entityUri[1];
+          }
+          const entityPageUrl = inputEntityId.value.match(new RegExp('^https?://[^/]+/entity(/(person|topic)/[0-9]+)'));
+          if (entityPageUrl) {
+            return entityPageUrl[1].replace('person', 'agent/base').replace('topic', 'concept/base');
+          }
+          return null;
+        }
+
+        function sendMessage(text) {
+          document.getElementById('message').innerText = text;
+        }
+
+        // click reset button
+        document.getElementById('reset-entity').addEventListener('click', e => {
+          e.preventDefault();
+          clearEntry();
+        });
+
+        // click go button
+        document.getElementById('find-entity').addEventListener('click', e => {
+          e.preventDefault();
+
+          // message
+          sendMessage('Processing...');
+
+          // is there a value
+          if (inputEntityId.value === '') {
+            sendMessage('You need to enter an entity ID.');
+            extension.field.setInvalid(true);
+            return;
+          }
+
+          // validate the value
+          const entityId = entityIdFromInput(inputEntityId.value);
+          if (entityId === null) {
+            sendMessage('Invalid entity ID.');
+            extension.field.setInvalid(true);
+            return;
+          }
+
+          const apiKey = extension.parameters.installation.apiKey;
+          const xhr = new XMLHttpRequest();
+
+          xhr.open('GET', `https://api.europeana.eu/entity${entityId}.jsonld?wskey=${apiKey}`);
+          xhr.send(null);
+          xhr.responseType = 'json';
+
+          xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) { // 4 = done
+              const response = xhr.response;
+              if (xhr.status === 200) {
+                // set field values
+                extension.entry.fields.identifier.setValue(response.id);
+                valueEntityId = response.id;
+
+                // TODO: set up a configurable map for other fields to avoid hard-coding them here
+                if (response.prefLabel) {
+                  extension.entry.fields.name.setValue(languageValue(response.prefLabel));
+                } else {
+                  extension.entry.fields.name.setValue('');
+                }
+
+                if (response.depiction) {
+                  extension.entry.fields.image.setValue(response.depiction.id);
+                  const previewImageTag = `<img src="${response.depiction.id}" alt="" />`;
+                  document.getElementById('depiction-preview').innerHTML = previewImageTag;
+                } else {
+                  document.getElementById('depiction-preview').innerHTML = '';
+                }
+
+                sendMessage('Success');
+              } else {
+                // extension.entry.fields.identifier.removeValue();
+                extension.field.setInvalid(true);
+                const errorMsg = response.error ? response.error : 'unknown';
+                sendMessage(`Error: ${errorMsg}`);
+              }
+            }
+          };
+        });
+      });
+    </script>
+  </body>
+</html>

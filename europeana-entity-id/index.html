@@ -92,14 +92,39 @@
         }
 
         // find a value in one of the defined languages
+        // return only the first value if there are many in an array
         function languageValue (value) {
-          const languageKeys = ['en', 'eng']; // TODO: move to configuration parameters
-          for (let key of languageKeys) {
+          if (value === undefined) return '';
+          
+          const languages = ['en', 'eng']; // TODO: move to configuration parameters
+          let localisedValue;
+
+          if (Array.isArray(value)) {
+            // an array likely has elements each being in expanded form
+            localisedValue = localiseExpandedTerms(value, languages)
+          } else {
+            // otherwise likely a language map
+            localisedValue = localiseLanguageMap(value, languages);
+          }
+
+          return Array.isArray(localisedValue) ? localisedValue[0] : localisedValue;
+        }
+
+        function localiseExpandedTerms(value, languages) {
+          const expandedTerm = value.find((element) => {
+            return languageKeys.includes(element['@language'])
+          });
+          if (expandedTerm !== undefined) {
+            return expandedTerm['@value'];
+          }
+        }
+
+        function localiseLanguageMap(value, languages) {
+          for (let key of languages) {
             if (value.hasOwnProperty(key)) {
               return value[key];
             }
           }
-          return '';
         }
 
         // clear all fields
@@ -116,7 +141,7 @@
         }
 
         function entityIdFromInput(value) {
-          const entityUri = inputEntityId.value.match(new RegExp('^http://data.europeana.eu(/(agent|concept|place)/(base/)?[0-9]+$)'));
+          const entityUri = inputEntityId.value.match(new RegExp('^http://data.europeana.eu(/(agent|concept|place|organization)/(base/)?[0-9]+$)'));
           if (entityUri) {
             return entityUri[1];
           }
@@ -125,6 +150,10 @@
             return entityPageUrl[1].replace('person', 'agent/base').replace('topic', 'concept/base');
           }
           return null;
+        }
+
+        function entityTypeFromId(entityId) {
+            return entityId.match(/\/(agent|concept|place|organization)\//)[1];
         }
 
         function sendMessage(text) {
@@ -170,23 +199,52 @@
             if (xhr.readyState === 4) { // 4 = done
               const response = xhr.response;
               if (xhr.status === 200) {
+                // ID is valid
+                extension.field.setInvalid(false);
+
                 // set field values
-                extension.entry.fields.identifier.setValue(response.id);
+                extension.entry.fields.identifier.setValue(response.id); // data.europeana.eu URI
                 valueEntityId = response.id;
 
                 // TODO: set up a configurable map for other fields to avoid hard-coding them here
+
+                // set name field from `prefLabel`
+                extension.entry.fields.name.setValue('');
                 if (response.prefLabel) {
                   extension.entry.fields.name.setValue(languageValue(response.prefLabel));
-                } else {
-                  extension.entry.fields.name.setValue('');
                 }
 
+                // set description from different fields based on entity type
+                let entityDescription = '';
+                switch (entityTypeFromId(entityId)) {
+                  case 'agent':
+                    // use `biographicalInformation`
+                    // NB: this is in JSON-LD expanded form
+                    entityDescription = languageValue(response.biographicalInformation);
+                    break;
+                  case 'concept':
+                    // use `note`
+                    // NB: language map with each value being an array of literals
+                    entityDescription = languageValue(response.note);
+                    break;
+                  case 'organization':
+                    // use `description`
+                    // NB: language map with each value being a single literal
+                    entityDescription = languageValue(response.description);
+                    break;
+                  case 'place':
+                    // TODO: use what? `${lat},${long}?`
+                    break;
+                }
+                extension.entry.fields.description.setValue(entityDescription);
+
+                // set image field from `depiction`
+                extension.entry.fields.image.setValue('');
+                document.getElementById('depiction-preview').innerHTML = '';
                 if (response.depiction) {
                   extension.entry.fields.image.setValue(response.depiction.id);
                   const previewImageTag = `<img src="${response.depiction.id}" alt="" />`;
                   document.getElementById('depiction-preview').innerHTML = previewImageTag;
-                } else {
-                  document.getElementById('depiction-preview').innerHTML = '';
                 }
 
                 sendMessage('Success');

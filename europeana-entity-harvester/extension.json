@@ -1,8 +1,8 @@
 {
-  "id": "europeanaEntityId",
-  "name": "Europeana entity ID",
+  "id": "europeanaEntityHarvester",
+  "name": "Europeana entity harvester",
   "srcdoc": "./index.html",
-  "fieldTypes": ["Symbol", "Text"],
+  "fieldTypes": [],
   "parameters": {
     "installation": [
       {
@@ -11,5 +11,6 @@
         "name": "API Key"
       }
     ]
-  }
+  },
+  "sidebar": true
 }

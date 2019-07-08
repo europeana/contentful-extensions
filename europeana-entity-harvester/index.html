@@ -76,7 +76,7 @@
 
         function sendMessage(text) {
           const envelope = document.getElementById('message');
-          envelope.innerHTML = `<b>${text}</b>`;
+          envelope.innerHTML = `<strong>${text}</strong>`;
           envelope.style.display = 'block';
         }
 
@@ -158,7 +158,7 @@
 
           // set name field from `prefLabel`
           if (extension.entry.fields.name) {
-            extension.entry.fields.name.setValue('');
+            extension.entry.fields.name.removeValue();
             if (response.prefLabel) {
               extension.entry.fields.name.setValue(languageValue(response.prefLabel));
             }
@@ -166,13 +166,13 @@
 
           // set description from different fields based on entity type
           if (extension.entry.fields.description) {
-            extension.entry.fields.description.setValue('');
+            extension.entry.fields.description.removeValue();
             extension.entry.fields.description.setValue(entityDescriptionFromResponse(response));
           }
 
           // set image field from `depiction`
           if (extension.entry.fields.image) {
-            extension.entry.fields.image.setValue('');
+            extension.entry.fields.image.removeValue();
             if (response.depiction) {
               extension.entry.fields.image.setValue(response.depiction.id);
             }
@@ -180,7 +180,7 @@
         }
 
         // button click handler
-        document.getElementById('entityHarvest').addEventListener('click', e => {
+        document.getElementById('entityHarvest').addEventListener('click', () => {
           harvestFromUrl();
         });
       });

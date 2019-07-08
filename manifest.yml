@@ -1,0 +1,6 @@
+# Cloud Foundry manifest
+---
+buildpack: staticfile_buildpack
+memory: 64M
+health-check-type: port
+stack: cflinuxfs3

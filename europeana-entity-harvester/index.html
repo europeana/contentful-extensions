@@ -33,6 +33,9 @@
           if (Array.isArray(value)) {
             // an array likely has elements each being in expanded form
             localisedValue = localiseExpandedTerms(value, languages)
+          } else if (value.hasOwnProperty('@language') && value.hasOwnProperty('@value')) {
+            // single expanded form term
+            localisedValue = localiseExpandedTerms([value], languages);
           } else {
             // otherwise likely a language map
             localisedValue = localiseLanguageMap(value, languages);

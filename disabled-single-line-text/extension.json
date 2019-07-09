@@ -1,0 +1,16 @@
+{
+  "id": "disabledSingleLineText",
+  "name": "Disabled single line text",
+  "srcdoc": "./index.html",
+  "fieldTypes": ["Symbol"],
+  "parameters": {
+    "instance": [
+      {
+        "id": "helpText",
+        "type": "Symbol",
+        "name": "Help text",
+        "description": "This help text will show up below the field"
+      }
+    ]
+  }
+}

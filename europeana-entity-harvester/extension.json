@@ -1,0 +1,16 @@
+{
+  "id": "europeanaEntityHarvester",
+  "name": "Europeana entity harvester",
+  "srcdoc": "./index.html",
+  "fieldTypes": [],
+  "parameters": {
+    "installation": [
+      {
+        "id": "apiKey",
+        "type": "Symbol",
+        "name": "API Key"
+      }
+    ]
+  },
+  "sidebar": true
+}

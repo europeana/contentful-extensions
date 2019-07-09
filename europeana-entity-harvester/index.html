@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Europeana entity harvester</title>
+    <link rel="stylesheet" href="https://contentful.github.io/ui-extensions-sdk/cf-extension.css">
+    <script src="https://unpkg.com/contentful-ui-extensions-sdk@3"></script>
+  </head>
+  <body>
+
+    <div>
+      <button id="entityHarvest" class="cf-btn-primary">Harvest</button>
+      <p id="message" style="display: none;"></p>
+    </div>
+
+    <script>
+      'use strict';
+
+      // TODO: disable the button if there is no `identifier` field
+      // TODO: show a spinner when it's harvesting
+
+      window.contentfulExtension.init(extension => {
+        extension.window.startAutoResizer();
+
+        // find a value in one of the defined languages
+        // return only the first value if there are many in an array
+        function languageValue(value) {
+          if (value === undefined) return '';
+
+          const languages = ['en', 'eng']; // TODO: move to configuration parameters
+          let localisedValue;
+
+          if (Array.isArray(value)) {
+            // an array likely has elements each being in expanded form
+            localisedValue = localiseExpandedTerms(value, languages)
+          } else if (value.hasOwnProperty('@language') && value.hasOwnProperty('@value')) {
+            // single expanded form term
+            localisedValue = localiseExpandedTerms([value], languages);
+          } else {
+            // otherwise likely a language map
+            localisedValue = localiseLanguageMap(value, languages);
+          }
+
+          return Array.isArray(localisedValue) ? localisedValue[0] : localisedValue;
+        }
+
+        function localiseExpandedTerms(value, languages) {
+          const expandedTerm = value.find((element) => {
+            return languages.includes(element['@language'])
+          });
+          if (expandedTerm !== undefined) {
+            return expandedTerm['@value'];
+          }
+        }
+
+        function localiseLanguageMap(value, languages) {
+          for (let key of languages) {
+            if (value.hasOwnProperty(key)) {
+              return value[key];
+            }
+          }
+        }
+
+        function entityIdFromUrl(entityUrl) {
+          const uriMatch = entityUrl.match(new RegExp('^http://data.europeana.eu(/(agent|concept|place|organization)/(base/)?[0-9]+$)'));
+          if (uriMatch) return uriMatch[1];
+
+          const pageMatch = entityUrl.match(new RegExp('^https?://[^/]+/entity(/(person|topic)/[0-9]+)'));
+          if (pageMatch) {
+            return pageMatch[1].replace('person', 'agent/base').replace('topic', 'concept/base');
+          }
+
+          throw new Error;
+        }
+
+        function entityTypeFromUri(entityUrl) {
+            return entityUrl.match(/\/(agent|concept|place|organization)\//)[1];
+        }
+
+        function sendMessage(text) {
+          const envelope = document.getElementById('message');
+          envelope.innerHTML = `<strong>${text}</strong>`;
+          envelope.style.display = 'block';
+        }
+
+        function showError(message) {
+          extension.dialogs.openAlert({
+            title: 'Error',
+            message: message
+          });
+          sendMessage('Failed');
+        }
+
+        async function harvestFromUrl() {
+          const entityUrl = await extension.dialogs.openPrompt({
+            title: 'Harvest',
+            message: 'Enter a Portal entity page URL, or an entity URI',
+            intent: 'positive'
+          });
+          if (!entityUrl) return;
+
+          let entityId;
+          try {
+            entityId = entityIdFromUrl(entityUrl);
+          } catch(error) {
+            showError(`Unable to harvest from URL: ${entityUrl}`);
+            return;
+          }
+
+          entityFromApi(entityId)
+            .then(entity => {
+              if (entity.valid) {
+                populateFields(entity.json);
+                sendMessage('Success');
+              } else {
+                showError(entity.error);
+              }
+            });
+        }
+
+        async function entityFromApi(entityId) {
+          const apiKey = extension.parameters.installation.apiKey;
+          const response = await fetch(`https://api.europeana.eu/entity${entityId}.jsonld?wskey=${apiKey}`);
+          const responseJson = await response.json();
+
+          if (response.ok) {
+            return { valid: true, json: responseJson };
+          } else {
+            return { valid: false, error: responseJson.error ? responseJson.error : 'unknown' };
+          }
+        }
+
+        function entityDescriptionFromResponse(response) {
+          switch (entityTypeFromUri(response.id)) {
+            case 'agent':
+              // use `biographicalInformation`
+              // NB: this is in JSON-LD expanded form
+              return languageValue(response.biographicalInformation);
+              break;
+            case 'concept':
+              // use `note`
+              // NB: language map with each value being an array of literals
+              return languageValue(response.note);
+              break;
+            case 'organization':
+              // use `description`
+              // NB: language map with each value being a single literal
+              return languageValue(response.description);
+              break;
+            case 'place':
+              // TODO: use what? `${lat},${long}?`
+              return '';
+              break;
+          }
+        }
+
+        // TODO: set up a configurable map for other fields to avoid hard-coding them here
+        function populateFields(response) {
+          // set field values
+          extension.entry.fields.identifier.setValue(response.id); // data.europeana.eu URI
+
+          // set name field from `prefLabel`
+          if (extension.entry.fields.name) {
+            extension.entry.fields.name.removeValue();
+            if (response.prefLabel) {
+              extension.entry.fields.name.setValue(languageValue(response.prefLabel));
+            }
+          }
+
+          // set description from different fields based on entity type
+          if (extension.entry.fields.description) {
+            extension.entry.fields.description.removeValue();
+            extension.entry.fields.description.setValue(entityDescriptionFromResponse(response));
+          }
+
+          // set image field from `depiction`
+          if (extension.entry.fields.image) {
+            extension.entry.fields.image.removeValue();
+            if (response.depiction) {
+              extension.entry.fields.image.setValue(response.depiction.id);
+            }
+          }
+        }
+
+        // button click handler
+        document.getElementById('entityHarvest').addEventListener('click', () => {
+          harvestFromUrl();
+        });
+      });
+    </script>
+  </body>
+</html>

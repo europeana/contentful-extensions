@@ -30,12 +30,12 @@
           harvestImageAndAttribution(recordUrl)
             .then(response => {
               if (response.valid) {
+                document.getElementById('message').innerText = 'Processing';
                 clearFields();
                 populateFields(response.json, response.recordId);
-                document.getElementById('message').innerText = 'Processing';
               } else {
                 document.getElementById('message').innerText = response.error;
-                document.getElementById('message').style.color = 'red';
+                document.getElementById('message').style.color = '#d9453f';
               }
               document.getElementById('message').style.display = 'block';
             });
@@ -58,7 +58,12 @@
         // populate fields
         async function populateFields(response, recordId) {
           const image = response.object.aggregations[0].edmIsShownBy;
-
+          if (!image) {
+            document.getElementById('message').innerText = 'No image found';
+            document.getElementById('message').style.color = '#d9453f';
+            return;
+          }
+          
           // look up image info, attribution (title, provider, creator) and rights statement
           const providerAggregation = response.object.aggregations[0];
           const resource = providerAggregation.webResources.find( r => {

@@ -19,6 +19,9 @@
       window.contentfulExtension.init(extension => {
         extension.window.startAutoResizer();
 
+        const message = document.getElementById('message');
+        const defaultLanguage = 'en-GB';
+
         // show dialog to harvest image + attribution
         async function showHarvestDialog() {
           const recordUrl = await extension.dialogs.openPrompt({
@@ -30,14 +33,14 @@
           harvestImageAndAttribution(recordUrl)
             .then(response => {
               if (response.valid) {
-                document.getElementById('message').innerText = 'Processing';
+                message.innerText = 'Processing';
                 clearFields();
                 populateFields(response.json, response.recordId);
               } else {
-                document.getElementById('message').innerText = response.error;
-                document.getElementById('message').style.color = '#d9453f';
+                message.innerText = response.error;
+                message.style.color = '#d9453f';
               }
-              document.getElementById('message').style.display = 'block';
+              message.style.display = 'block';
             });
         }
 
@@ -59,8 +62,8 @@
         async function populateFields(response, recordId) {
           const image = response.object.aggregations[0].edmIsShownBy;
           if (!image) {
-            document.getElementById('message').innerText = 'No image found';
-            document.getElementById('message').style.color = '#d9453f';
+            message.innerText = 'No image found';
+            message.style.color = '#d9453f';
             return;
           }
           
@@ -80,8 +83,8 @@
                                languageValue(providerAggregation.edmDataProvider)];
 
           extension.entry.fields.identifier.setValue(recordId);
-          extension.entry.fields.attribution.setValue(attribution.filter(Boolean).join(', '));
-          extension.entry.fields.rightsStatement.setValue(languageValue(providerAggregation.edmRights));
+          extension.entry.fields.citation.setValue(attribution.filter(Boolean).join(', '));
+          extension.entry.fields.license.setValue(languageValue(providerAggregation.edmRights));
 
           // create an asset
           const asset = {
@@ -89,32 +92,33 @@
               title: {},
               file: {}
             }
-          }
-          asset.fields.title['en-GB'] = languageValue(providerProxy.dcTitle) ? languageValue(providerProxy.dcTitle) : recordId;
-          asset.fields.file['en-GB'] = {
+          };
+
+          asset.fields.title[defaultLanguage] = languageValue(providerProxy.dcTitle) ? languageValue(providerProxy.dcTitle) : recordId;
+          asset.fields.file[defaultLanguage] = {
             contentType: resource.ebucoreHasMimeType,
-            fileName: asset.fields.title['en-GB'],
+            fileName: asset.fields.title[defaultLanguage],
             upload: image
           }
 
           const rawAsset = await extension.space.createAsset(asset);
-          await extension.space.processAsset(rawAsset, 'en-GB');
+          await extension.space.processAsset(rawAsset, defaultLanguage);
 
           const processedAsset = await extension.space.waitUntilAssetProcessed(
             rawAsset.sys.id,
-            'en-GB'
+            defaultLanguage
           );
 
           const publishedAsset = await extension.space.publishAsset(processedAsset);
-          await extension.entry.fields.heroImage.setValue({
+          await extension.entry.fields.image.setValue({
             sys: {
-              type: "Link",
-              linkType: "Asset",
+              type: 'Link',
+              linkType: 'Asset',
               id: publishedAsset.sys.id
             }
           });
 
-          document.getElementById('message').innerText = 'Success';
+          message.innerText = 'Success';
         }
 
         // find a value in one of the defined languages
@@ -130,7 +134,7 @@
 
         // clear all fields related to harvest
         function clearFields() {
-          const fields = ['identifier', 'attribution', 'rightsStatement', 'heroImage']
+          const fields = ['identifier', 'citation', 'license', 'image']
           for (let field of fields) {
             extension.entry.fields[field].removeValue();
           }

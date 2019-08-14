@@ -20,7 +20,7 @@
         extension.window.startAutoResizer();
 
         const message = document.getElementById('message');
-        const defaultLanguage = 'en-GB';
+        const locale = 'en-GB';
 
         // show dialog to harvest image + attribution
         async function showHarvestDialog() {
@@ -51,11 +51,11 @@
 
           const response = await fetch(`https://api.europeana.eu/api/v2/record${recordId}.json?wskey=${apiKey}`);
           const responseJson = await response.json();
+
           if (response.ok) {
             return { valid: true, json: responseJson, recordId: recordId };
-          } else {
-            return { valid: false, error: responseJson.error ? responseJson.error : 'unknown' };
           }
+          return { valid: false, error: responseJson.error ? responseJson.error : 'unknown' };
         }
 
         // populate fields
@@ -66,7 +66,7 @@
             message.style.color = '#d9453f';
             return;
           }
-          
+
           // look up image info, attribution (title, provider, creator) and rights statement
           const providerAggregation = response.object.aggregations[0];
           const resource = providerAggregation.webResources.find( r => {
@@ -78,13 +78,16 @@
             return p.europeanaProxy === false;
           });
 
+          const rights = languageValue(resource.webResourceEdmRights) ? languageValue(resource.webResourceEdmRights) : languageValue(providerAggregation.edmRights);
+          const creator = languageValue(resource.dcCreator) ? languageValue(resource.dcCreator) : languageValue(providerProxy.dcCreator);
+
           const attribution = [languageValue(providerProxy.dcTitle),
-                               languageValue(providerProxy.dcCreator),
+                               creator,
                                languageValue(providerAggregation.edmDataProvider)];
 
           extension.entry.fields.identifier.setValue(recordId);
           extension.entry.fields.citation.setValue(attribution.filter(Boolean).join(', '));
-          extension.entry.fields.license.setValue(languageValue(providerAggregation.edmRights));
+          extension.entry.fields.license.setValue(rights);
 
           // create an asset
           const asset = {
@@ -94,19 +97,19 @@
             }
           };
 
-          asset.fields.title[defaultLanguage] = languageValue(providerProxy.dcTitle) ? languageValue(providerProxy.dcTitle) : recordId;
-          asset.fields.file[defaultLanguage] = {
+          asset.fields.title[locale] = languageValue(providerProxy.dcTitle) ? languageValue(providerProxy.dcTitle) : recordId;
+          asset.fields.file[locale] = {
             contentType: resource.ebucoreHasMimeType,
-            fileName: asset.fields.title[defaultLanguage],
+            fileName: asset.fields.title[locale],
             upload: image
           }
 
           const rawAsset = await extension.space.createAsset(asset);
-          await extension.space.processAsset(rawAsset, defaultLanguage);
+          await extension.space.processAsset(rawAsset, locale);
 
           const processedAsset = await extension.space.waitUntilAssetProcessed(
             rawAsset.sys.id,
-            defaultLanguage
+            locale
           );
 
           const publishedAsset = await extension.space.publishAsset(processedAsset);

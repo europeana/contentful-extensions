@@ -2,7 +2,7 @@
   "id": "europeanaImageHarvester",
   "name": "Europeana image harvester",
   "srcdoc": "./index.html",
-  "fieldTypes": ["Symbol"],
+  "fieldTypes": [],
   "parameters": {
     "installation": [
       {

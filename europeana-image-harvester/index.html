@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Europeana image harvester</title>
+    <link rel="stylesheet" href="https://contentful.github.io/ui-extensions-sdk/cf-extension.css">
+    <script src="https://unpkg.com/contentful-ui-extensions-sdk@3"></script>
+  </head>
+  <body>
+
+    <div>
+      <button id="imageHarvest" class="cf-btn-primary">Harvest</button>
+      <p id="message" style="display: none;"></p>
+    </div>
+
+    <script>
+      'use strict';
+
+      window.contentfulExtension.init(extension => {
+        extension.window.startAutoResizer();
+
+        // show dialog to harvest image + attribution
+        async function showHarvestDialog() {
+          const recordUrl = await extension.dialogs.openPrompt({
+            title: 'Harvest',
+            message: 'Enter a record page URL'
+          });
+          if (!recordUrl) return;
+
+          harvestImageAndAttribution(recordUrl)
+            .then(response => {
+              if (response.valid) {
+                clearFields();
+                populateFields(response.json, response.recordId);
+                document.getElementById('message').innerText = 'Processing';
+              } else {
+                document.getElementById('message').innerText = response.error;
+                document.getElementById('message').style.color = 'red';
+              }
+              document.getElementById('message').style.display = 'block';
+            });
+        }
+
+        // get the image and attribution
+        async function harvestImageAndAttribution (recordUrl) {
+          const recordId = recordUrl.match('\/[0-9]+\/[a-zA-Z0-9_]+$')[0];
+          const apiKey = extension.parameters.installation.apiKey;
+
+          const response = await fetch(`https://api.europeana.eu/api/v2/record${recordId}.json?wskey=${apiKey}`);
+          const responseJson = await response.json();
+          if (response.ok) {
+            return { valid: true, json: responseJson, recordId: recordId };
+          } else {
+            return { valid: false, error: responseJson.error ? responseJson.error : 'unknown' };
+          }
+        }
+
+        // populate fields
+        async function populateFields(response, recordId) {
+          const image = response.object.aggregations[0].edmIsShownBy;
+
+          // look up image info, attribution (title, provider, creator) and rights statement
+          const providerAggregation = response.object.aggregations[0];
+          const resource = providerAggregation.webResources.find( r => {
+            return r.about === image;
+          });
+
+          const proxies = response.object.proxies;
+          const providerProxy = proxies.find( p => {
+            return p.europeanaProxy === false;
+          });
+
+          const attribution = [languageValue(providerProxy.dcTitle),
+                               languageValue(providerProxy.dcCreator),
+                               languageValue(providerAggregation.edmDataProvider)];
+
+          extension.entry.fields.identifier.setValue(recordId);
+          extension.entry.fields.attribution.setValue(attribution.filter(Boolean).join(', '));
+          extension.entry.fields.rightsStatement.setValue(languageValue(providerAggregation.edmRights));
+
+          // create an asset
+          const asset = {
+            fields: {
+              title: {},
+              file: {}
+            }
+          }
+          asset.fields.title['en-GB'] = languageValue(providerProxy.dcTitle) ? languageValue(providerProxy.dcTitle) : recordId;
+          asset.fields.file['en-GB'] = {
+            contentType: resource.ebucoreHasMimeType,
+            fileName: asset.fields.title['en-GB'],
+            upload: image
+          }
+
+          const rawAsset = await extension.space.createAsset(asset);
+          await extension.space.processAsset(rawAsset, 'en-GB');
+
+          const processedAsset = await extension.space.waitUntilAssetProcessed(
+            rawAsset.sys.id,
+            'en-GB'
+          );
+
+          const publishedAsset = await extension.space.publishAsset(processedAsset);
+          await extension.entry.fields.heroImage.setValue({
+            sys: {
+              type: "Link",
+              linkType: "Asset",
+              id: publishedAsset.sys.id
+            }
+          });
+
+          document.getElementById('message').innerText = 'Success';
+        }
+
+        // find a value in one of the defined languages
+        function languageValue (value) {
+          if (!value) return;
+          const languageKeys = ['en', 'eng', 'def', 'und']; // TODO: move to configuration parameters
+          for (let key of languageKeys) {
+            if (value[key]) {
+              return value[key].length > 1 ? value[key].join(', ') : value[key][0];
+            }
+          }
+        }
+
+        // clear all fields related to harvest
+        function clearFields() {
+          const fields = ['identifier', 'attribution', 'rightsStatement', 'heroImage']
+          for (let field of fields) {
+            extension.entry.fields[field].removeValue();
+          }
+        }
+
+        // button click handler
+        document.getElementById('imageHarvest').addEventListener('click', () => {
+          showHarvestDialog();
+        });
+      });
+    </script>
+  </body>
+</html>

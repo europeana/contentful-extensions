@@ -99,7 +99,7 @@
 
           asset.fields.title[locale] = languageValue(providerProxy.dcTitle) ? languageValue(providerProxy.dcTitle) : recordId;
           asset.fields.file[locale] = {
-            contentType: resource.ebucoreHasMimeType,
+            contentType: resource.ebucoreHasMimeType ? resource.ebucoreHasMimeType : 'application/octet-stream',
             fileName: asset.fields.title[locale],
             upload: image
           }

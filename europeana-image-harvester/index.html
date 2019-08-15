@@ -34,6 +34,7 @@
             .then(response => {
               if (response.valid) {
                 message.innerText = 'Processing';
+                message.style.color = '#2d2f31';
                 clearFields();
                 populateFields(response.json, response.recordId);
               } else {
@@ -126,6 +127,7 @@
           });
 
           message.innerText = 'Success';
+          message.style.color = '#2d2f31';
         }
         
         // find a value in one of the defined languages

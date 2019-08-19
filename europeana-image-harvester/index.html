@@ -51,12 +51,12 @@
           if (!recordId) {
             return { valid: false, error: 'Unknown record, please enter a record page URL, or a record ID' };
           }
-          
+
           const apiKey = extension.parameters.installation.apiKey;
           recordId = recordId[0];
           const response = await fetch(`https://api.europeana.eu/api/v2/record${recordId}.json?wskey=${apiKey}`);
           const responseJson = await response.json();
-          
+
           if (response.ok) {
             return { valid: true, json: responseJson, recordId: recordId };
           }
@@ -65,7 +65,7 @@
 
         // populate fields
         async function populateFields(response, recordId) {
-          const image = response.object.aggregations[0].edmIsShownBy;          
+          const image = response.object.aggregations[0].edmIsShownBy;
           if (!image) {
             message.innerText = 'No image found';
             message.style.color = '#d9453f';
@@ -94,6 +94,13 @@
           extension.entry.fields.citation.setValue(attribution.filter(Boolean).join(', '));
           extension.entry.fields.license.setValue(rights);
 
+          // check mimeType
+          if (!/^image/.test(resource.ebucoreHasMimeType)) {
+            message.innerText = 'No image found';
+            message.style.color = '#d9453f';
+            return;
+          }
+
           // create an asset
           const asset = {
             fields: {
@@ -111,12 +118,12 @@
 
           const rawAsset = await extension.space.createAsset(asset);
           await extension.space.processAsset(rawAsset, locale);
-          
+
           const processedAsset = await extension.space.waitUntilAssetProcessed(
             rawAsset.sys.id,
             locale
           );
-          
+
           const publishedAsset = await extension.space.publishAsset(processedAsset);
           await extension.entry.fields.image.setValue({
             sys: {
@@ -129,7 +136,7 @@
           message.innerText = 'Success';
           message.style.color = '#2d2f31';
         }
-        
+
         // find a value in one of the defined languages
         function languageValue (value) {
           if (!value) return;

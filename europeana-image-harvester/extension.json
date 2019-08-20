@@ -1,0 +1,16 @@
+{
+  "id": "europeanaImageHarvester",
+  "name": "Europeana image harvester",
+  "srcdoc": "./index.html",
+  "fieldTypes": [],
+  "parameters": {
+    "installation": [
+      {
+        "id": "apiKey",
+        "type": "Symbol",
+        "name": "API Key"
+      }
+    ]
+  },
+  "sidebar": true
+}

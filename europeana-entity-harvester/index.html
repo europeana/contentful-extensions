@@ -164,7 +164,7 @@
         function populateFields(response) {
           // set field values
           extension.entry.fields.identifier.setValue(response.id); // data.europeana.eu URI
-          extension.entry.fields.url.setValue(entitySlug(response)); // slug
+          extension.entry.fields.slug.setValue(entitySlug(response)); // slug
 
           // set name field from `prefLabel`
           if (extension.entry.fields.name) {

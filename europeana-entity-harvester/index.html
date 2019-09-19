@@ -20,6 +20,8 @@
       // TODO: show a spinner when it's harvesting
 
       window.contentfulExtension.init(extension => {
+        let entityType;
+        
         extension.window.startAutoResizer();
 
         // find a value in one of the defined languages
@@ -64,9 +66,11 @@
         function entityIdFromUrl(entityUrl) {
           const uriMatch = entityUrl.match(new RegExp('^http://data.europeana.eu(/(agent|concept|place|organization)/(base/)?[0-9]+$)'));
           if (uriMatch) return uriMatch[1];
-
+          
           const pageMatch = entityUrl.match(new RegExp('^https?://[^/]+/entity(/(person|topic)/[0-9]+)'));
+          
           if (pageMatch) {
+            entityType = pageMatch[2];
             return pageMatch[1].replace('person', 'agent/base').replace('topic', 'concept/base');
           }
 
@@ -106,7 +110,7 @@
             showError(`Unable to harvest from URL: ${entityUrl}`);
             return;
           }
-
+          
           entityFromApi(entityId)
             .then(entity => {
               if (entity.valid) {
@@ -164,7 +168,14 @@
         function populateFields(response) {
           // set field values
           extension.entry.fields.identifier.setValue(response.id); // data.europeana.eu URI
-          extension.entry.fields.slug.setValue(entitySlug(response)); // slug
+          
+          if (extension.entry.fields.slug) {
+            extension.entry.fields.slug.setValue(entitySlug(response)); // slug
+          }
+          
+          if (extension.entry.fields.type) {
+            extension.entry.fields.type.setValue(entityType); // entity type
+          }
 
           // set name field from `prefLabel`
           if (extension.entry.fields.name) {

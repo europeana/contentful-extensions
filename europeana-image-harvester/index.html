@@ -98,6 +98,8 @@
           const dataProvider = languageValue(providerAggregation.edmDataProvider);
           const rights = languageValue(resource.webResourceEdmRights) ? languageValue(resource.webResourceEdmRights) : languageValue(providerAggregation.edmRights);
 
+          // TODO: concatenated citation is not intended to be retained long-term;
+          //       remove references from here once production is not reliant on it.
           const attribution = [title, creator, dataProvider].filter(Boolean).join(', ');
 
           const imageMetadata = {

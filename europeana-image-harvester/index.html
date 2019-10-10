@@ -24,9 +24,17 @@
 
         // show dialog to harvest image + attribution
         async function showHarvestDialog() {
+          let currentRecordUrl;
+          if (extension.entry.fields.url) {
+            currentRecordUrl = extension.entry.fields.url.getValue();
+          } else if (extension.entry.fields.identifier) {
+            currentRecordUrl = extension.entry.fields.identifier.getValue();
+          }
+
           const recordUrl = await extension.dialogs.openPrompt({
             title: 'Harvest',
-            message: 'Enter a record page URL, or a record ID'
+            defaultValue: currentRecordUrl || '',
+            message: 'Enter a record page URL, or a record URI or ID.'
           });
           if (!recordUrl) return;
 
@@ -46,10 +54,10 @@
         }
 
         // get the image and attribution
-        async function harvestImageAndAttribution (recordUrl) {
+        async function harvestImageAndAttribution(recordUrl) {
           let recordId = recordUrl.match('\/[0-9]+\/[a-zA-Z0-9_]+$');
           if (!recordId) {
-            return { valid: false, error: 'Unknown record, please enter a record page URL, or a record ID' };
+            return { valid: false, error: 'Unknown record. Please enter a record page URL, or a record URI or ID.' };
           }
 
           const apiKey = extension.parameters.installation.apiKey;
@@ -72,6 +80,8 @@
             return;
           }
 
+          const recordUri = `http://data.europeana.eu/item${recordId}`;
+
           // look up image info, attribution (title, provider, creator) and rights statement
           const providerAggregation = response.object.aggregations[0];
           const resource = providerAggregation.webResources.find( r => {
@@ -83,16 +93,28 @@
             return p.europeanaProxy === false;
           });
 
-          const rights = languageValue(resource.webResourceEdmRights) ? languageValue(resource.webResourceEdmRights) : languageValue(providerAggregation.edmRights);
+          const title = languageValue(providerProxy.dcTitle);
           const creator = languageValue(resource.dcCreator) ? languageValue(resource.dcCreator) : languageValue(providerProxy.dcCreator);
+          const dataProvider = languageValue(providerAggregation.edmDataProvider);
+          const rights = languageValue(resource.webResourceEdmRights) ? languageValue(resource.webResourceEdmRights) : languageValue(providerAggregation.edmRights);
 
-          const attribution = [languageValue(providerProxy.dcTitle),
-                               creator,
-                               languageValue(providerAggregation.edmDataProvider)];
+          const attribution = [title, creator, dataProvider].filter(Boolean).join(', ');
 
-          extension.entry.fields.identifier.setValue(recordId);
-          extension.entry.fields.citation.setValue(attribution.filter(Boolean).join(', '));
-          extension.entry.fields.license.setValue(rights);
+          const imageMetadata = {
+            citation: attribution,
+            creator: creator,
+            identifier: recordId,
+            license: rights,
+            name: title,
+            provider: dataProvider,
+            url: recordUri
+          };
+
+          for (const field in imageMetadata) {
+            if (extension.entry.fields[field]) {
+              extension.entry.fields[field].setValue(imageMetadata[field]);
+            }
+          }
 
           // check mimeType
           if (!/^image/.test(resource.ebucoreHasMimeType)) {
@@ -138,7 +160,7 @@
         }
 
         // find a value in one of the defined languages
-        function languageValue (value) {
+        function languageValue(value) {
           if (!value) return;
           const languageKeys = ['en', 'eng', 'def', 'und']; // TODO: move to configuration parameters
           for (let key of languageKeys) {
@@ -150,9 +172,11 @@
 
         // clear all fields related to harvest
         function clearFields() {
-          const fields = ['identifier', 'citation', 'license', 'image']
+          const fields = ['identifier', 'creator', 'citation', 'license', 'name', 'provider', 'url', 'image'];
           for (let field of fields) {
-            extension.entry.fields[field].removeValue();
+            if (extension.entry.fields[field]) {
+              extension.entry.fields[field].removeValue();
+            }
           }
         }
 

@@ -11,6 +11,13 @@
     <div>
       <button id="entityHarvest" class="cf-btn-primary">Harvest</button>
       <p id="message" style="display: none;"></p>
+      <div class="cf-form-hint">
+        Examples:
+        <ul style="margin-top: 0; padding-left: 1.25rem;">
+          <li>http://data.europeana.eu/agent/base/59832</li>
+          <li>https://demo.europeana.eu/en/collections/person/60404-johannes-vermeer</li>
+        </ul>
+      </div>
     </div>
 
     <script>
@@ -65,17 +72,17 @@
           const uriMatch = entityUrl.match(new RegExp('^http://data.europeana.eu(/(agent|concept|place|organization)/(base/)?[0-9]+$)'));
           if (uriMatch) return uriMatch[1];
 
-          const pageMatch = entityUrl.match(new RegExp('^https?://[^/]+/entity(/(person|topic)/[0-9]+)'));
+          const pageMatch = entityUrl.match(new RegExp('^https?://[^/]+(/[a-z]{2})?/collections(/(person|topic)/[0-9]+)'));
 
           if (pageMatch) {
-            return pageMatch[1].replace('person', 'agent/base').replace('topic', 'concept/base');
+            return pageMatch[2].replace('person', 'agent/base').replace('topic', 'concept/base');
           }
 
           throw new Error;
         }
 
         function entityTypeFromUri(entityUrl) {
-            return entityUrl.match(/\/(agent|concept|place|organization)\//)[1];
+          return entityUrl.match(/\/(agent|concept|place|organization)\//)[1];
         }
 
         function getEntityTypeHumanReadable(type) {
@@ -106,7 +113,7 @@
         async function harvestFromUrl() {
           const entityUrl = await extension.dialogs.openPrompt({
             title: 'Harvest',
-            message: 'Enter a Portal entity page URL, or an entity URI',
+            message: 'Enter a Portal entity/collection page URL, or an entity URI',
             intent: 'positive'
           });
           if (!entityUrl) return;
@@ -132,7 +139,8 @@
 
         async function entityFromApi(entityId) {
           const apiKey = extension.parameters.installation.apiKey;
-          const response = await fetch(`https://api.europeana.eu/entity${entityId}.jsonld?wskey=${apiKey}`);
+          const origin = 'https://api.europeana.eu';
+          const response = await fetch(`${origin}/entity${entityId}.jsonld?wskey=${apiKey}`);
           const responseJson = await response.json();
 
           if (response.ok) {
@@ -176,7 +184,7 @@
         function populateFields(response) {
           // set field values
           extension.entry.fields.identifier.setValue(response.id); // data.europeana.eu URI
-          
+
           if (extension.entry.fields.slug) {
             extension.entry.fields.slug.setValue(entitySlug(response)); // slug
           }
@@ -199,11 +207,11 @@
             extension.entry.fields.description.setValue(entityDescriptionFromResponse(response));
           }
 
-          // set image field from `depiction`
+          // set image field from `isShownBy`
           if (extension.entry.fields.image) {
             extension.entry.fields.image.removeValue();
-            if (response.depiction) {
-              extension.entry.fields.image.setValue(response.depiction.id);
+            if (response.isShownBy) {
+              extension.entry.fields.image.setValue(response.isShownBy.thumbnail);
             }
           }
         }

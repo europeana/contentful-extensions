@@ -1,15 +1,16 @@
 {
-  "id": "europeanaRecordID",
-  "name": "Europeana record ID",
+  "id": "europeanaItemHarvester",
+  "name": "Europeana item harvester",
   "srcdoc": "./index.html",
-  "fieldTypes": ["Symbol", "Text"],
+  "fieldTypes": [],
   "parameters": {
     "installation": [
       {
-        "id": "API_KEY",
+        "id": "apiKey",
         "type": "Symbol",
         "name": "API Key"
       }
     ]
-  }
+  },
+  "sidebar": true
 }

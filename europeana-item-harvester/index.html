@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Europeana item harvester</title>
+    <link rel="stylesheet" href="https://contentful.github.io/ui-extensions-sdk/cf-extension.css">
+    <script src="https://unpkg.com/contentful-ui-extensions-sdk@3"></script>
+  </head>
+  <body>
+
+    <div>
+      <button id="itemHarvest" class="cf-btn-primary">Harvest</button>
+      <p id="message" style="display: none;"></p>
+    </div>
+
+    <script>
+      'use strict';
+
+      // TODO: disable the button if there is no `identifier` field
+      // TODO: show a spinner when it's harvesting
+
+      window.contentfulExtension.init(extension => {
+        extension.window.startAutoResizer();
+
+        const languageKeys = ['en', 'eng', 'def', 'und']; // TODO: move to configuration parameter?
+
+        function languageValue(value) {
+          for (const key of languageKeys) {
+            if (value[key]) {
+              return value[key][0];
+            }
+          }
+          return Object.values(value)[0];
+        }
+
+        function itemIdFromUrl(itemUrl) {
+          const uriMatch = itemUrl.match(new RegExp('(record|item)(/[0-9]+/[a-zA-Z0-9_]+)$'));
+          if (uriMatch) return uriMatch[2];
+
+          throw new Error;
+        }
+
+        function sendMessage(text) {
+          const envelope = document.getElementById('message');
+          envelope.innerHTML = `<strong>${text}</strong>`;
+          envelope.style.display = 'block';
+        }
+
+        function showError(message) {
+          extension.dialogs.openAlert({
+            title: 'Error',
+            message: message
+          });
+          sendMessage('Failed');
+        }
+
+        async function harvestFromUrl() {
+          const itemUrl = await extension.dialogs.openPrompt({
+            title: 'Harvest',
+            message: 'Enter a Portal item page URL, or an item URI',
+            intent: 'positive'
+          });
+          if (!itemUrl) return;
+
+          let itemId;
+          try {
+            itemId = itemIdFromUrl(itemUrl);
+          } catch(error) {
+            showError(`Unable to harvest from URL: ${itemUrl}`);
+            return;
+          }
+
+          itemFromApi(itemId)
+            .then(item => {
+              if (item.valid) {
+                populateFields(item.json.object);
+                sendMessage('Success');
+              } else {
+                showError(item.error);
+              }
+            });
+        }
+
+        async function itemFromApi(itemId) {
+          const apiKey = extension.parameters.installation.apiKey;
+          const origin = 'https://api.europeana.eu';
+          const response = await fetch(`${origin}/record${itemId}.json?wskey=${apiKey}`);
+          const responseJson = await response.json();
+
+          if (response.ok) {
+            return { valid: true, json: responseJson };
+          } else {
+            return { valid: false, error: responseJson.error ? responseJson.error : 'unknown' };
+          }
+        }
+
+        // function itemUri(id) {
+        //   return `http://data.europeana.eu/item${id}`;
+        // }
+
+        // TODO: set up a configurable map for other fields to avoid hard-coding them here
+        function populateFields(response) {
+          // set field values
+          extension.entry.fields.identifier.setValue(response.about);
+
+          if (extension.entry.fields.name) {
+            extension.entry.fields.name.removeValue();
+            extension.entry.fields.name.setValue(languageValue(response.proxies[0].dcTitle));
+          }
+
+          if (extension.entry.fields.creator) {
+            extension.entry.fields.creator.removeValue();
+            extension.entry.fields.creator.setValue(languageValue(response.proxies[0].dcCreator));
+          }
+
+          if (extension.entry.fields.provider) {
+            extension.entry.fields.provider.removeValue();
+            extension.entry.fields.provider.setValue(languageValue(response.aggregations[0].edmDataProvider));
+          }
+
+          if (extension.entry.fields.thumbnailUrl) {
+            extension.entry.fields.thumbnailUrl.removeValue();
+            extension.entry.fields.thumbnailUrl.setValue(response.europeanaAggregation.edmPreview);
+          }
+        }
+
+        // button click handler
+        document.getElementById('itemHarvest').addEventListener('click', () => {
+          harvestFromUrl();
+        });
+      });
+    </script>
+  </body>
+</html>

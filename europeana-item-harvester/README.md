@@ -1,6 +1,6 @@
-# Europeana record ID
+# Europeana item harvester ID
 
-Harvests record metadata from the
+Harvests metadata from the
 [Europeana Record API](https://pro.europeana.eu/resources/apis/record).
 
 ## Access
@@ -14,5 +14,5 @@ With the Contentful CLI:
 ```bash
 API_KEY=yourApiKey
 contentful extension create --descriptor ./extension.json --srcdoc ./index.html \
-  --installation-parameters '{"API_KEY": "'${API_KEY}'"}'
+  --installation-parameters '{"apiKey": "'${API_KEY}'"}'
 ```

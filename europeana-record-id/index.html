@@ -151,7 +151,7 @@
           xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) { // 4 = done
               if (xhr.status === 200) {
-                const response = xhr.response.object;
+                const response = xhr.response;
                 if (response.itemsCount === 1 && response.items) {
                   const item = response.items[0];
                   let objectTitle;

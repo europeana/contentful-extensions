@@ -154,12 +154,11 @@
                 const response = xhr.response;
                 if (response.itemsCount === 1 && response.items) {
                   const item = response.items[0];
-                  let objectTitle;
+                  const objectTitle = languageValue(item.dcTitleLangAware, recordId).substring(0,255);
                   // set field values
                   extension.entry.fields.identifier.setValue(recordId);
                   valueRecordID = recordId;
 
-                  objectTitle = languageValue(item.dcTitleLangAware, recordId).substring(0,255);;
                   extension.entry.fields.name.setValue(objectTitle);
                   extension.entry.fields.encoding.setValue(item);
 

@@ -93,15 +93,15 @@
         }
 
         // find a value in one of the defined languages
-        function languageValue (value) {
-          if(!value) return;
+        function languageValue (value, recordId) {
+          if(!value || typeof(value) !== 'object') return `Record ${recordId}`;
           const languageKeys = ['en', 'eng', 'def', 'und']; // TODO: move to configuration parameters
           for (let key of languageKeys) {
             if (value[key]) {
               return value[key][0];
             }
           }
-          return value[Object.keys(value)[0]][0];
+          return value[Object.keys(value)[0]][0] || `Record ${recordId}`;
         }
 
         // clear all fields
@@ -159,7 +159,7 @@
                   extension.entry.fields.identifier.setValue(recordId);
                   valueRecordID = recordId;
 
-                  objectTitle = languageValue(item.dcTitleLangAware);
+                  objectTitle = languageValue(item.dcTitleLangAware, recordId).substring(0,255);;
                   extension.entry.fields.name.setValue(objectTitle);
                   extension.entry.fields.encoding.setValue(item);
 

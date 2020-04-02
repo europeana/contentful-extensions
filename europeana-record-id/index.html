@@ -93,14 +93,15 @@
         }
 
         // find a value in one of the defined languages
-        function languageValue (value) {
+        function languageValue (value, recordId) {
+          if(!value || typeof(value) !== 'object') return `Record ${recordId}`;
           const languageKeys = ['en', 'eng', 'def', 'und']; // TODO: move to configuration parameters
           for (let key of languageKeys) {
             if (value[key]) {
               return value[key][0];
             }
           }
-          return;
+          return value[Object.keys(value)[0]][0] || `Record ${recordId}`;
         }
 
         // clear all fields
@@ -142,45 +143,35 @@
           const apiKey = extension.parameters.installation.API_KEY;
           const xhr = new XMLHttpRequest();
 
-          xhr.open('GET', 'https://api.europeana.eu/api/v2/record' + recordId + '.json?wskey=' + apiKey);
+
+          xhr.open('GET', 'https://api.europeana.eu/record/search.json?profile=minimal&query=europeana_id%3A%22' + recordId + '%22&rows=1&wskey=' + apiKey);
           xhr.send(null);
           xhr.responseType = 'json';
 
           xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) { // 4 = done
               if (xhr.status === 200) {
+                const response = xhr.response;
+                if (response.itemsCount === 1 && response.items) {
+                  const item = response.items[0];
+                  const objectTitle = languageValue(item.dcTitleLangAware, recordId).substring(0,255);
+                  // set field values
+                  extension.entry.fields.identifier.setValue(recordId);
+                  valueRecordID = recordId;
 
-                const response = xhr.response.object;
-                let objectTitle;
+                  extension.entry.fields.name.setValue(objectTitle);
+                  extension.entry.fields.encoding.setValue(item);
 
-                // set field values
-                extension.entry.fields.identifier.setValue(recordId);
-                valueRecordID = recordId;
-
-                // TODO: specify a map EDM / other form fields
-                if (response.proxies) {
-                  if (response.proxies[0].dcTitle) {
-                    objectTitle = languageValue(response.proxies[0].dcTitle);
-                    extension.entry.fields.name.setValue(objectTitle);
+                  if (item.edmPreview) {
+                    document.getElementById('thumbnail-preview').innerHTML = '<img src="' + item.edmPreview[0] + '&size=w200" alt="" />'
                   }
 
-                  if (response.proxies[0].dcCreator) {
-                    // in case of multiple creators, it just picks the first one
-                    extension.entry.fields.creator.setValue(languageValue(response.proxies[0].dcCreator));
-                  }
+                  document.getElementById('message').innerText = 'Success';
                 }
-
-                if (response.aggregations) {
-                  extension.entry.fields.provider.setValue(languageValue(response.aggregations[0].edmDataProvider));
+                else {
+                  extension.entry.fields.identifier.removeValue();
+                  document.getElementById('message').innerText = 'Error: record was NOT found.';
                 }
-
-                if (response.europeanaAggregation.edmPreview) {
-                  extension.entry.fields.thumbnailUrl.setValue(response.europeanaAggregation.edmPreview);
-                  document.getElementById('thumbnail-preview').innerHTML = '<img src="' + response.europeanaAggregation.edmPreview + '&size=w200" alt="" />'
-                }
-
-                document.getElementById('message').innerText = 'Success';
-
               } else {
                 // error message
                 extension.entry.fields.identifier.removeValue();

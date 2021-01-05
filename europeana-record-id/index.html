@@ -58,8 +58,8 @@
         let valueRecordID = fieldRecordID.getValue();
         validateInput();
 
-        if (extension.entry.fields.thumbnailUrl.getValue()) {
-          document.getElementById('thumbnail-preview').innerHTML = '<img src="' + extension.entry.fields.thumbnailUrl.getValue() + '&size=w200" alt="" style="width: auto; height: 100%;" />'
+        if (extension.entry.fields.encoding.getValue() && extension.entry.fields.encoding.getValue().edmPreview) {
+          document.getElementById('thumbnail-preview').innerHTML = '<img src="' + extension.entry.fields.encoding.getValue().edmPreview[0] + '&size=w200" alt="" style="width: auto; height: 100%;" />'
         }
 
         const detachValueChangeHandler = fieldRecordID.onValueChanged(valueChangeHandler);
